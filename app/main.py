@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException, Depends, Security
 from fastapi.security.api_key import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
 from dotenv import load_dotenv
 
 # Import custom modules
@@ -31,18 +32,18 @@ app.add_middleware(
 # Global Logs
 DASHBOARD_LOGS = []
 
-
 @app.on_event("startup")
 def startup_event():
-    """Initialize the database on startup."""
-    memory.init_db()
-
+    """Initialize database connection on application startup."""
+    try:
+        memory.init_db()
+    except Exception as e:
+        print(f"Critical DB Failure: {e}")
 
 class ChatRequest(BaseModel):
     """Schema for chat requests."""
     session_id: str
     message: str
-
 
 def verify_api_key(x_api_key: str = Security(APIKeyHeader(name="x-api-key", auto_error=False))):
     """Validate the API key from headers."""

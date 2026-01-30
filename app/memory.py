@@ -17,38 +17,55 @@ DB_PATH = os.path.join(
 )
 
 
-def init_db() -> None:
-    """Initialize the SQLite database and threats table."""
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS threats (
-                domain TEXT PRIMARY KEY,
-                type TEXT,
-                confidence FLOAT,
-                last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        conn.commit()
-    except sqlite3.Error as e:
-        print(f"Database Initialization Error: {e}")
-    finally:
-        if 'conn' in locals():
-            conn.close()
+import sqlite3
+import os
+
+# Define the path relative to THIS file
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_FOLDER = os.path.join(BASE_DIR, "../data")
+DB_PATH = os.path.join(DB_FOLDER, "threats.db")
+
+def init_db():
+    # 1. Create the 'data' folder if it is missing
+    if not os.path.exists(DB_FOLDER):
+        print(f"Creating: {DB_FOLDER}")
+        os.makedirs(DB_FOLDER)
+
+    # 2. Connect (creates the file automatically)
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    # 3. Create Tables (Idempotent - safe to run multiple times)
+    # Session Table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS sessions (
+            session_id TEXT PRIMARY KEY,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            status TEXT DEFAULT 'active'
+        )
+    ''')
+
+    # Threat Intel Cache (URLs, Emails, Phones)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS threat_cache (
+            value TEXT PRIMARY KEY,
+            type TEXT,
+            confidence REAL,
+            last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    conn.commit()
+    conn.close()
+    print("Database initialized successfully.")
+
+def get_db_connection():
+    if not os.path.exists(DB_PATH):
+        init_db()
+    return sqlite3.connect(DB_PATH)
 
 
 def check_cache(domain: str) -> Optional[Dict[str, Any]]:
-    """
-    Check if a domain exists in the threat database.
-
-    Args:
-        domain (str): The domain to check.
-
-    Returns:
-        dict: The threat record or None.
-    """
     if not domain:
         return None
         
